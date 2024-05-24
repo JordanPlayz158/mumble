@@ -29,6 +29,9 @@ static bool isWin32 = false;
 #include "common.h"
 #include "engine.h"
 
+// For Logging
+#include <iostream>
+
 static inline void anglesToVectors(const float (&angles)[3], float *front, float *top) {
 	// Calculate pitch
 	float pitchSin, pitchCos;
@@ -226,43 +229,56 @@ static int tryLock(const std::multimap< std::wstring, unsigned long long int > &
 
 	auto iter = modules.find(isWin32 ? "engine.dll" : "engine.so");
 	if (iter == modules.cend()) {
+		std::cout << "Could not find 'engine.so' in modules" << std::endl;
 		return false;
 	}
 
 	const auto engine = iter->second.baseAddress();
 	if (!engine) {
+		std::cout << "Could not find 'engine.so' base address" << std::endl;
 		return false;
 	}
 
 	iter = modules.find(isWin32 ? "client.dll" : "client.so");
 	if (iter == modules.cend()) {
+		std::cout << "Could not find 'client.so' in modules" << std::endl;
 		return false;
 	}
 
 	const auto client = iter->second.baseAddress();
 	if (!client) {
+		std::cout << "Could not find 'client.so' base address" << std::endl;
 		return false;
 	}
 
 	const auto engineInterfaces = getInterfaces(engine);
+//	std::cout << "Engine Interfaces Map Size: " << engineInterfaces.size() << std::endl;
+//	for (auto& x: engineInterfaces) {
+//		std::cout << x.first << ": " << x.second << std::endl;
+//	}
 
 	const auto engineClient = getInterfaceAddress("VEngineClient013", engineInterfaces);
+
 	if (!engineClient) {
+		std::cout << "Could not find 'VEngineClient013' interface address" << std::endl;
 		return false;
 	}
 
 	localClient = getLocalClient(engineClient);
 	if (!localClient) {
+		std::cout << "Could not get local Engine Client: " << localClient << std::endl;
 		return false;
 	}
 
 	signOnStateOffset = getSignOnStateOffset(engineClient);
 	if (!signOnStateOffset) {
+		std::cout << "Could not get sign on state offset" << std::endl;
 		return false;
 	}
 
 	const auto signOnState = proc->peek< uint32_t >(localClient + signOnStateOffset);
 	if (signOnState != 6) {
+		std::cout << "Could not get sign on state" << std::endl;
 		return false;
 	}
 
@@ -270,17 +286,20 @@ static int tryLock(const std::multimap< std::wstring, unsigned long long int > &
 
 	const auto clientEntityList = getInterfaceAddress("VClientEntityList003", clientInterfaces);
 	if (!clientEntityList) {
+		std::cout << "Could not find 'VClientEntityList003' interface address" << std::endl;
 		return false;
 	}
 
 	localPlayer = getLocalPlayer(localClient, clientEntityList, engineClient);
 	if (!localPlayer) {
+		std::cout << "Could not get local player" << std::endl;
 		return false;
 	}
 
 	// "pl" is the offset to the internal player class.
 	const auto pl = getDataVarFromEntity("pl", localPlayer);
 	if (!pl) {
+		std::cout << "Could not get pl offset to the internal player class" << std::endl;
 		return false;
 	}
 
@@ -294,26 +313,31 @@ static int tryLock(const std::multimap< std::wstring, unsigned long long int > &
 
 	originPositionOffset = getDataVarFromEntity("m_vecAbsOrigin", localPlayer);
 	if (!originPositionOffset) {
+		std::cout << "Could not get origin position offset" << std::endl;
 		return false;
 	}
 
 	eyesPositionOffsetOffset = getDataVarFromEntity("m_vecViewOffset", localPlayer);
 	if (!eyesPositionOffsetOffset) {
+		std::cout << "Could not get eyes position offset offset" << std::endl;
 		return false;
 	}
 
 	rotationOffset = getDataVarFromEntity("m_angAbsRotation", localPlayer);
 	if (!rotationOffset) {
+		std::cout << "Could not get rotation offset" << std::endl;
 		return false;
 	}
 
 	netInfoOffset = getNetInfoOffset(localClient, engineClient);
 	if (!netInfoOffset) {
+		std::cout << "Could not get net info offset" << std::endl;
 		return false;
 	}
 
 	levelNameOffset = getLevelNameOffset(engineClient);
 	if (!levelNameOffset) {
+		std::cout << "Could not get local name offset" << std::endl;
 		return false;
 	}
 

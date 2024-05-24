@@ -6,6 +6,9 @@
 #ifndef MUMBLE_MUMBLE_PLUGIN_SE_ENGINE_
 #define MUMBLE_MUMBLE_PLUGIN_SE_ENGINE_
 
+// Logging
+#include <iostream>
+
 struct NetInfo {
 	uint32_t type;
 	uint8_t ip[4];
@@ -18,6 +21,7 @@ static procptr_t getLocalClient(const procptr_t engineClient) {
 	// There are multiple clients because of the split screen feature.
 
 	const auto GetNetChannelInfo = proc->virtualFunction(engineClient, 74);
+	std::cout << GetNetChannelInfo << std::endl;
 
 	// Windows:
 	// E8 ?? ?? ?? ??    call    GetBaseLocalClient
@@ -32,9 +36,21 @@ static procptr_t getLocalClient(const procptr_t engineClient) {
 	// 8B 40 ??          mov     eax, [eax+?]
 	// C9                leave
 	// C3                retn
-	const auto callTarget         = proc->peek< int32_t >(GetNetChannelInfo + (isWin32 ? 1 : 7));
-	const auto callInstructionEnd = GetNetChannelInfo + (isWin32 ? 5 : 11);
+
+	// TODO:
+	//  GMOD only
+	// 0x86 or 0x87
+	const auto callTarget         = proc->peek< int32_t >(GetNetChannelInfo + 0x87);
+	const auto callInstructionEnd = GetNetChannelInfo + 0x8B;
 	const auto GetBaseLocalClient = callInstructionEnd + callTarget;
+
+
+	//const auto callTarget         = proc->peek< int32_t >(GetNetChannelInfo + (isWin32 ? 1 : 7));
+	//const auto callInstructionEnd = GetNetChannelInfo + (isWin32 ? 5 : 11);
+	//const auto GetBaseLocalClient = callInstructionEnd + callTarget;
+
+
+
 
 	// Windows:
 	// A1 ?? ?? ?? ??    mov     eax, dword_????????
@@ -48,8 +64,13 @@ static procptr_t getLocalClient(const procptr_t engineClient) {
 	// 5D                pop     ebp
 	// 83 C0 ??          add     eax, ?
 	// C3                retn
-	return proc->peekPtr(proc->peek< uint32_t >(GetBaseLocalClient + 1))
-		   + proc->peek< int8_t >(GetBaseLocalClient + (isWin32 ? 7 : 11));
+
+	// TODO: GMod only currently
+	return proc->peekPtr(proc->peek< uint32_t >(GetBaseLocalClient + 19));
+	//	   + proc->peek< int8_t >(GetBaseLocalClient + 29);
+
+	//return proc->peekPtr(proc->peek< uint32_t >(GetBaseLocalClient + 1))
+	//	   + proc->peek< int8_t >(GetBaseLocalClient + (isWin32 ? 7 : 11));
 }
 
 static int8_t getSignOnStateOffset(const procptr_t engineClient) {

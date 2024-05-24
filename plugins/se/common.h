@@ -6,6 +6,9 @@
 #ifndef MUMBLE_MUMBLE_PLUGIN_SE_COMMON_
 #define MUMBLE_MUMBLE_PLUGIN_SE_COMMON_
 
+// Logging
+#include <iostream>
+
 typedef std::map< std::string, procptr_t > Interfaces;
 
 struct InterfaceReg {
@@ -20,16 +23,23 @@ static Interfaces getInterfaces(const procptr_t module) {
 	// s_pInterfaceRegs is exported on Linux
 	auto s_pInterfaceRegs = proc->exportedSymbol("s_pInterfaceRegs", module);
 	if (!s_pInterfaceRegs) {
+		std::cout << "s_pInterfaceRegs not found" << std::endl;
+
 		const auto CreateInterface = proc->exportedSymbol("CreateInterface", module);
 		if (CreateInterface == 0) {
+			std::cout << "CreateInterface == 0, returning empty map" << std::endl;
 			return interfaces;
 		}
+
+		std::cout << "CreateInterface = " << CreateInterface << std::endl;
+
 
 		bool jmpOnly;
 
 		if (proc->peek< uint8_t >(CreateInterface) == 0xE9) {
 			// Left 4 Dead:
 			// E9 ?? ?? ?? ??    jmp    CreateInterface_0
+			std::cout << "Detected Left 4 Dead" << std::endl;
 			jmpOnly = true;
 		} else {
 			// Other games:
@@ -44,6 +54,8 @@ static Interfaces getInterfaces(const procptr_t module) {
 		const auto jmpInstructionEnd       = CreateInterface + (jmpOnly ? 5 : 9);
 		const auto CreateInterfaceInternal = jmpInstructionEnd + jmpTarget;
 
+		std::cout << "jmpTarget: " << jmpTarget << ", jmpInstructionEnd: " << jmpInstructionEnd << ", CreateInterfaceInternal: " << CreateInterfaceInternal << std::endl;
+
 		// Left 4 Dead:
 		// 56                   push    esi
 		// 8B 35 ?? ?? ?? ??    mov     esi, s_pInterfaceRegs
@@ -55,11 +67,18 @@ static Interfaces getInterfaces(const procptr_t module) {
 		// 8B EC                mov     ebp, esp
 		// 56                   push    esi
 		// 8B 35 ?? ?? ?? ??    mov     esi, s_pInterfaceRegs
+
+		// TODO: remove or refactor, this check only exists for checking if it is left 4 dead 1 or 2
 		if (proc->peek< uint16_t >(CreateInterfaceInternal + (jmpOnly ? 1 : 4)) != 0x358B) {
-			return interfaces;
+			std::printf("%X != 0x358B\n", proc->peek< uint16_t >(CreateInterfaceInternal + (jmpOnly ? 1 : 4)));
+			std::cout << "proc->peek< uint16_t >(CreateInterfaceInternal + (jmpOnly ? 1 : 4)) != 0x358B, returning empty map" << std::endl;
+			//return interfaces;
 		}
 
-		s_pInterfaceRegs = proc->peek< uint32_t >(CreateInterfaceInternal + (jmpOnly ? 3 : 6));
+		// TODO: GMOD ONLY
+		s_pInterfaceRegs = proc->peek< uint32_t >(CreateInterfaceInternal + 11);
+
+		//s_pInterfaceRegs = proc->peek< uint32_t >(CreateInterfaceInternal + (jmpOnly ? 3 : 6));
 	}
 
 	auto iface = proc->peek< InterfaceReg >(proc->peekPtr(s_pInterfaceRegs));
