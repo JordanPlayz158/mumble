@@ -9,6 +9,10 @@
 
 #include <chrono>
 
+// Logging
+#include <iostream>
+
+
 ProcessBase::ProcessBase(const procid_t id, const std::string &name)
 	: Host(id), m_ok(false), m_name(name), m_pointerSize(0) {
 }
@@ -58,6 +62,7 @@ std::string ProcessBase::peekString(const procptr_t address, const size_t length
 procptr_t ProcessBase::virtualFunction(const procptr_t classObject, const size_t index) const {
 	const auto vTable = peekPtr(classObject);
 	if (!vTable) {
+		std::cout << "No vTable found" << std::endl;
 		return 0;
 	}
 

@@ -20,8 +20,10 @@ static procptr_t getLocalClient(const procptr_t engineClient) {
 	// GetLocalClient() gets the client from an array at the index passed to the function.
 	// There are multiple clients because of the split screen feature.
 
-	const auto GetNetChannelInfo = proc->virtualFunction(engineClient, 74);
-	std::cout << GetNetChannelInfo << std::endl;
+	// TODO:
+	//  74 for Left 4 Dead
+	//  72 for GMOD
+//	const auto GetNetChannelInfo = proc->virtualFunction(engineClient, 72);
 
 	// Windows:
 	// E8 ?? ?? ?? ??    call    GetBaseLocalClient
@@ -40,14 +42,14 @@ static procptr_t getLocalClient(const procptr_t engineClient) {
 	// TODO:
 	//  GMOD only
 	// 0x86 or 0x87
-	const auto callTarget         = proc->peek< int32_t >(GetNetChannelInfo + 0x87);
-	const auto callInstructionEnd = GetNetChannelInfo + 0x8B;
-	const auto GetBaseLocalClient = callInstructionEnd + callTarget;
+//	const auto callTarget         = proc->peek< int32_t >(GetNetChannelInfo + 3);
+//	const auto callInstructionEnd = GetNetChannelInfo + 7;
+//	const auto GetBaseLocalClient = callInstructionEnd + callTarget;
 
 
-	//const auto callTarget         = proc->peek< int32_t >(GetNetChannelInfo + (isWin32 ? 1 : 7));
-	//const auto callInstructionEnd = GetNetChannelInfo + (isWin32 ? 5 : 11);
-	//const auto GetBaseLocalClient = callInstructionEnd + callTarget;
+//	const auto callTarget         = proc->peek< int32_t >(GetNetChannelInfo + (isWin32 ? 1 : 7));
+//	const auto callInstructionEnd = GetNetChannelInfo + (isWin32 ? 5 : 11);
+//	const auto GetBaseLocalClient = callInstructionEnd + callTarget;
 
 
 
@@ -66,15 +68,22 @@ static procptr_t getLocalClient(const procptr_t engineClient) {
 	// C3                retn
 
 	// TODO: GMod only currently
-	return proc->peekPtr(proc->peek< uint32_t >(GetBaseLocalClient + 19));
-	//	   + proc->peek< int8_t >(GetBaseLocalClient + 29);
+	auto iter = proc->modules().find("engine.so");
+	auto engineBaseAddress = iter->second.baseAddress();
+	//std::cout << "engine.so base address: " << engineBaseAddress << std::endl;
+	auto address = engineBaseAddress + 0x00325060 + 1;
+	//std::cout << "LocalBaseClient address: " << address << std::endl;
 
-	//return proc->peekPtr(proc->peek< uint32_t >(GetBaseLocalClient + 1))
-	//	   + proc->peek< int8_t >(GetBaseLocalClient + (isWin32 ? 7 : 11));
+	return proc->peekPtr(address);
+		   //+ proc->peek< int8_t >(address + 10);
+
+	//return proc->peekPtr(proc->peek< uint32_t >(engineBaseAddress))
+	//	   + proc->peek< int8_t >(engineBaseAddress + 10);
 }
 
 static int8_t getSignOnStateOffset(const procptr_t engineClient) {
 	const auto IsInGame = proc->virtualFunction(engineClient, 26);
+	std::printf("Is In Game address: %X\n", IsInGame);
 
 	// Windows:
 	// E8 ?? ?? ?? ??    call    GetBaseLocalClient
@@ -92,7 +101,9 @@ static int8_t getSignOnStateOffset(const procptr_t engineClient) {
 	// C9                leave
 	// 0F 94 C0          setz    al
 	// C3                retn
-	return proc->peek< int8_t >(IsInGame + (isWin32 ? 9 : 13));
+
+	return proc->peek< int8_t >(IsInGame + 9);
+	//return proc->peek< int8_t >(IsInGame + (isWin32 ? 9 : 13));
 }
 
 static int32_t getLevelNameOffset(const procptr_t engineClient) {

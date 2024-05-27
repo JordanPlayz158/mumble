@@ -270,15 +270,20 @@ static int tryLock(const std::multimap< std::wstring, unsigned long long int > &
 		return false;
 	}
 
-	signOnStateOffset = getSignOnStateOffset(engineClient);
-	if (!signOnStateOffset) {
-		std::cout << "Could not get sign on state offset" << std::endl;
-		return false;
-	}
+	// TODO: GMod Linux no offset
+//	signOnStateOffset = getSignOnStateOffset(engineClient);
+//	if (!signOnStateOffset) {
+//		std::cout << "Could not get sign on state offset" << std::endl;
+//		return false;
+//	}
 
-	const auto signOnState = proc->peek< uint32_t >(localClient + signOnStateOffset);
+	//const auto signOnState = proc->peek< uint32_t >(engine + proc->peek< uint32_t >(proc->virtualFunction(localClient, 26) + 2));
+	// TODO: GMOD WORKS FOR THE LOVE OF GOD DO NOT DELETE UNTIL BETTER WAY WORKS
+	//  const auto signOnState = proc->peek< uint32_t >(engine + 0x00a02fb0);
+	const auto signOnState = proc->peek< uint32_t >(engine + 0xA02FB0);
+
 	if (signOnState != 6) {
-		std::cout << "Could not get sign on state" << std::endl;
+		std::cout << "Sign on State is not FULL (6): " << signOnState << std::endl;
 		return false;
 	}
 

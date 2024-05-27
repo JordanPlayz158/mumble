@@ -121,8 +121,10 @@ static procptr_t getLocalPlayer(const procptr_t localClient, procptr_t clientEnt
 	// C9                      leave
 	// 83 C0 01                add     eax, 1
 	// C3                      retn
-	const auto localPlayerIndexOffset = proc->peek< int32_t >(GetLocalPlayer + (isWin32 ? 9 : 20));
-	const auto localPlayerIndex       = proc->peek< uint32_t >(localClient + localPlayerIndexOffset) + 1;
+
+	// TODO: GMod no offsets needed - add if for not gmod
+	//const auto localPlayerIndexOffset = proc->peek< int32_t >(GetLocalPlayer + (isWin32 ? 9 : 20));
+	//const auto localPlayerIndex       = proc->peek< uint32_t >(localClient + localPlayerIndexOffset) + 1;
 
 	auto GetClientNetworkable = proc->virtualFunction(clientEntityList, 0);
 
@@ -172,7 +174,7 @@ static procptr_t getLocalPlayer(const procptr_t localClient, procptr_t clientEnt
 		entityCacheInfo = clientEntityList + proc->peek< int32_t >(GetClientNetworkable + 20);
 	}
 
-	const auto entity = proc->peek< EntityCacheInfo >(entityCacheInfo + sizeof(EntityCacheInfo) * localPlayerIndex);
+	const auto entity = proc->peek< EntityCacheInfo >(entityCacheInfo + sizeof(EntityCacheInfo)/** localPlayerIndex*/);
 
 	// We subtract 8 bytes in order to cast from IClientNetworkable to IClientEntity.
 	return entity.networkable ? (entity.networkable - 8) : 0;
