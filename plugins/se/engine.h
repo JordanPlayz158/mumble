@@ -15,15 +15,41 @@ struct NetInfo {
 	uint16_t port;
 };
 
-static procptr_t getLocalClient(const procptr_t engineClient) {
+using ptr_t = std::uint32_t;
+
+struct CEngineClient {
+	// Skipping 11 functions ptrs
+	ptr_t padding[11];
+	// Virtual Function 12
+	ptr_t GetLocalPlayer;
+	ptr_t padding2[13];
+	// Virtual Function 26
+	ptr_t IsInGame;
+	ptr_t padding3[45];
+	// Virtual Function 72
+	ptr_t GetNetChannelInfo;
+};
+
+
+static procptr_t getLocalClient(const procptr_t engineClientPtr, const CEngineClient engineClient) {
 	// We use GetBaseLocalClient() instead of GetLocalClient() because we just need the main client.
 	// GetLocalClient() gets the client from an array at the index passed to the function.
 	// There are multiple clients because of the split screen feature.
 
+	const auto modules = proc->modules();
+
+	auto iter = proc->modules().find("engine.so");
+	auto engineBaseAddress = iter->second.baseAddress();
+
 	// TODO:
 	//  74 for Left 4 Dead
 	//  72 for GMOD
-//	const auto GetNetChannelInfo = proc->virtualFunction(engineClient, 72);
+	const auto GetNetChannelInfo = proc->virtualFunction(engineClientPtr, 72);
+	std::printf("EngineClientPtr peekPtr address: 0x%lx\n", proc->peekPtr(engineClientPtr) - engineBaseAddress);
+	const auto GetNetChannelInfoViaStruct = engineClient.GetNetChannelInfo;
+
+	std::printf("GetNetChannelInfo: 0x%lX | GetNetChannelInfoViaStruct: 0x%lX\n", GetNetChannelInfo - engineBaseAddress, GetNetChannelInfoViaStruct - engineBaseAddress);
+	std::printf("GetNetChannelInfoDifference: %lu\n", (GetNetChannelInfoViaStruct - engineBaseAddress) - (GetNetChannelInfo - engineBaseAddress));
 
 	// Windows:
 	// E8 ?? ?? ?? ??    call    GetBaseLocalClient
@@ -68,8 +94,8 @@ static procptr_t getLocalClient(const procptr_t engineClient) {
 	// C3                retn
 
 	// TODO: GMod only currently
-	auto iter = proc->modules().find("engine.so");
-	auto engineBaseAddress = iter->second.baseAddress();
+	//auto iter = proc->modules().find("engine.so");
+	//auto engineBaseAddress = iter->second.baseAddress();
 	//std::cout << "engine.so base address: " << engineBaseAddress << std::endl;
 	auto address = engineBaseAddress + 0x00325060 + 1;
 	//std::cout << "LocalBaseClient address: " << address << std::endl;

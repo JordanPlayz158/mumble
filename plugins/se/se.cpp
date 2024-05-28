@@ -207,9 +207,9 @@ static bool tryInit(const std::multimap< std::wstring, unsigned long long int > 
 #else
 		isWin32 = HostLinux::isWine(id);
 		if (isWin32) {
-			proc.reset(new ProcessWindows(id, name));
+			proc = std::make_unique<ProcessWindows>(id, name);
 		} else {
-			proc.reset(new ProcessLinux(id, name));
+			proc = std::make_unique<ProcessLinux>(id, name);
 		}
 #endif
 		if (proc->isOk()) {
@@ -220,6 +220,23 @@ static bool tryInit(const std::multimap< std::wstring, unsigned long long int > 
 	return false;
 }
 
+static procptr_t getModuleBaseAddress(Modules modules, const std::string& module) {
+	auto fileName = module + "." + (isWin32 ? "dll" : "so");
+	auto iter = modules.find(fileName);
+	if (iter == modules.cend()) {
+		std::printf("Could not find '%s' in process modules\n", fileName.c_str());
+		return false;
+	}
+
+	const auto address = iter->second.baseAddress();
+	if (!address) {
+		std::printf("Could not find base address for '%s'\n", fileName.c_str());
+		return false;
+	}
+
+	return address;
+}
+
 static int tryLock(const std::multimap< std::wstring, unsigned long long int > &pids) {
 	if (!tryInit(pids)) {
 		return false;
@@ -227,44 +244,26 @@ static int tryLock(const std::multimap< std::wstring, unsigned long long int > &
 
 	const auto modules = proc->modules();
 
-	auto iter = modules.find(isWin32 ? "engine.dll" : "engine.so");
-	if (iter == modules.cend()) {
-		std::cout << "Could not find 'engine.so' in modules" << std::endl;
-		return false;
-	}
-
-	const auto engine = iter->second.baseAddress();
+	const auto engine = getModuleBaseAddress(modules, "engine");
 	if (!engine) {
-		std::cout << "Could not find 'engine.so' base address" << std::endl;
 		return false;
 	}
 
-	iter = modules.find(isWin32 ? "client.dll" : "client.so");
-	if (iter == modules.cend()) {
-		std::cout << "Could not find 'client.so' in modules" << std::endl;
-		return false;
-	}
-
-	const auto client = iter->second.baseAddress();
+	const auto client = getModuleBaseAddress(modules, "client");
 	if (!client) {
-		std::cout << "Could not find 'client.so' base address" << std::endl;
 		return false;
 	}
 
 	const auto engineInterfaces = getInterfaces(engine);
-//	std::cout << "Engine Interfaces Map Size: " << engineInterfaces.size() << std::endl;
-//	for (auto& x: engineInterfaces) {
-//		std::cout << x.first << ": " << x.second << std::endl;
-//	}
-
-	const auto engineClient = getInterfaceAddress("VEngineClient013", engineInterfaces);
-
-	if (!engineClient) {
+	const auto engineClientPtr = getInterfaceAddress("VEngineClient013", engineInterfaces);
+	if (!engineClientPtr) {
 		std::cout << "Could not find 'VEngineClient013' interface address" << std::endl;
 		return false;
 	}
 
-	localClient = getLocalClient(engineClient);
+	const auto engineClient = proc->peek<CEngineClient>(proc->peekPtr(engineClientPtr));
+
+	localClient = getLocalClient(engineClientPtr, engineClient);
 	if (!localClient) {
 		std::cout << "Could not get local Engine Client: " << localClient << std::endl;
 		return false;
@@ -295,12 +294,13 @@ static int tryLock(const std::multimap< std::wstring, unsigned long long int > &
 		return false;
 	}
 
-	localPlayer = getLocalPlayer(localClient, clientEntityList, engineClient);
+	localPlayer = getLocalPlayer(localClient, clientEntityList, engineClientPtr);
 	if (!localPlayer) {
 		std::cout << "Could not get local player" << std::endl;
 		return false;
 	}
 
+	std::cout << "Before pl code" << std::endl;
 	// "pl" is the offset to the internal player class.
 	const auto pl = getDataVarFromEntity("pl", localPlayer);
 	if (!pl) {
@@ -334,13 +334,13 @@ static int tryLock(const std::multimap< std::wstring, unsigned long long int > &
 		return false;
 	}
 
-	netInfoOffset = getNetInfoOffset(localClient, engineClient);
+	netInfoOffset = getNetInfoOffset(localClient, engineClientPtr);
 	if (!netInfoOffset) {
 		std::cout << "Could not get net info offset" << std::endl;
 		return false;
 	}
 
-	levelNameOffset = getLevelNameOffset(engineClient);
+	levelNameOffset = getLevelNameOffset(engineClientPtr);
 	if (!levelNameOffset) {
 		std::cout << "Could not get local name offset" << std::endl;
 		return false;

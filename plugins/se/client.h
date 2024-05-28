@@ -6,6 +6,13 @@
 #ifndef MUMBLE_MUMBLE_PLUGIN_SE_CLIENT_
 #define MUMBLE_MUMBLE_PLUGIN_SE_CLIENT_
 
+// Logging
+#include <iostream>
+
+struct CBasePlayer {
+
+};
+
 struct TypeDescription {
 	uint32_t fieldType;
 	uint32_t fieldName;
@@ -76,16 +83,28 @@ static int32_t getDataVar(const std::string &name, procptr_t predMap) {
 }
 
 static int32_t getDataVarFromEntity(const std::string &name, const procptr_t entity) {
-	procptr_t GetPredDescMap;
+	const auto modules = proc->modules();
+	const auto iter = modules.find("client.so");
+	const auto client = iter->second.baseAddress();
+
+	procptr_t GetPredDescMap = proc->virtualFunction(entity, 18);
+	std::printf("GetPredDescMap address RAW: 0x%X\n", GetPredDescMap);
+	std::printf("GetPredDescMap address: 0x%X\n", GetPredDescMap - client);
+
+
+	// TODO: For non-gmod?
+	//procptr_t GetPredDescMap;
 
 	// Brute-force virtual function index.
-	for (uint8_t i = 20; i > 16; --i) {
-		GetPredDescMap = proc->virtualFunction(entity, i);
 
-		if (proc->peek< uint8_t >(GetPredDescMap + (isWin32 ? 0 : 1)) == 0xB8) {
-			break;
-		}
-	}
+//	for (uint8_t i = 20; i > 16; --i) {
+//		GetPredDescMap = proc->virtualFunction(entity, i);
+//
+//		if (proc->peek< uint8_t >(GetPredDescMap + (isWin32 ? 0 : 1)) == 0xB8) {
+//			std::cout << "Virtual Function Index BruteForce Successful, Index: " << i << std::endl;
+//			break;
+//		}
+//	}
 
 	// Windows:
 	// B8 ?? ?? ?? ??    mov     eax, offset dword_????????
@@ -101,6 +120,8 @@ static int32_t getDataVarFromEntity(const std::string &name, const procptr_t ent
 }
 
 static procptr_t getLocalPlayer(const procptr_t localClient, procptr_t clientEntityList, const procptr_t engineClient) {
+
+
 	const auto GetLocalPlayer = proc->virtualFunction(engineClient, 12);
 
 	// Windows:
@@ -127,6 +148,7 @@ static procptr_t getLocalPlayer(const procptr_t localClient, procptr_t clientEnt
 	//const auto localPlayerIndex       = proc->peek< uint32_t >(localClient + localPlayerIndexOffset) + 1;
 
 	auto GetClientNetworkable = proc->virtualFunction(clientEntityList, 0);
+	std::cout << "GetClientNetworkable: " << GetClientNetworkable << std::endl;
 
 	// Left 4 Dead:
 	// 8B 44 24 04                mov     eax, [esp+arg_0]
@@ -174,7 +196,7 @@ static procptr_t getLocalPlayer(const procptr_t localClient, procptr_t clientEnt
 		entityCacheInfo = clientEntityList + proc->peek< int32_t >(GetClientNetworkable + 20);
 	}
 
-	const auto entity = proc->peek< EntityCacheInfo >(entityCacheInfo + sizeof(EntityCacheInfo)/** localPlayerIndex*/);
+	const auto entity = proc->peek< EntityCacheInfo >(entityCacheInfo + sizeof(EntityCacheInfo)/* * localPlayerIndex*/);
 
 	// We subtract 8 bytes in order to cast from IClientNetworkable to IClientEntity.
 	return entity.networkable ? (entity.networkable - 8) : 0;
