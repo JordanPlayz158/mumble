@@ -263,11 +263,12 @@ static int tryLock(const std::multimap< std::wstring, unsigned long long int > &
 
 	const auto engineClient = proc->peek<CEngineClient>(proc->peekPtr(engineClientPtr));
 
-	localClient = getLocalClient(engineClientPtr, engineClient);
-	if (!localClient) {
-		std::cout << "Could not get local Engine Client: " << localClient << std::endl;
-		return false;
-	}
+	//localClient = getLocalClient(engineClientPtr, engineClient);
+//	const auto localClientState = getLocalClient(engineClientPtr, engineClient);
+//	if (!localClientState) {
+//		std::cout << "Could not get CBaseClientState" << std::endl;
+//		return false;
+//	}
 
 	// TODO: GMod Linux no offset
 //	signOnStateOffset = getSignOnStateOffset(engineClient);
@@ -276,10 +277,16 @@ static int tryLock(const std::multimap< std::wstring, unsigned long long int > &
 //		return false;
 //	}
 
-	//const auto signOnState = proc->peek< uint32_t >(engine + proc->peek< uint32_t >(proc->virtualFunction(localClient, 26) + 2));
+	const auto isInGameDatPtr = proc->peekPtr(engineClient.IsInGame + 2);
+
+	const auto signOnState = proc->peek< uint32_t >(isInGameDatPtr);
+	const auto signOnStateEngineAdded = proc->peek< uint32_t >(engine + isInGameDatPtr);
 	// TODO: GMOD WORKS FOR THE LOVE OF GOD DO NOT DELETE UNTIL BETTER WAY WORKS
-	//  const auto signOnState = proc->peek< uint32_t >(engine + 0x00a02fb0);
-	const auto signOnState = proc->peek< uint32_t >(engine + 0xA02FB0);
+	  const auto signOnStateHardcoded = proc->peek< uint32_t >(engine + 0x00a02fb0);
+	//const auto signOnStateHardcoded = proc->peek< uint32_t >(engine + 0xA02FB0);
+
+	std::printf("IsInGame: 0x%lx | IsInGameDatPtr: 0x%lx | SignOnState: %d | SignOnStateEngineAdded: %d | SignOnStateHardcoded: %d\n",
+				engineClient.IsInGame - engine, isInGameDatPtr - engine, signOnState, signOnStateEngineAdded, signOnStateHardcoded);
 
 	if (signOnState != 6) {
 		std::cout << "Sign on State is not FULL (6): " << signOnState << std::endl;

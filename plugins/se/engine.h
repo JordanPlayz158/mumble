@@ -18,8 +18,10 @@ struct NetInfo {
 using ptr_t = std::uint32_t;
 
 struct CEngineClient {
-	// Skipping 11 functions ptrs
-	ptr_t padding[11];
+	// Skipping 12 functions ptrs - Need to add 1 extra byte of padding at the start
+	//  for it to align correctly, not sure why could just be skipping over the ptr or address
+	//  for CEngineClient VTable ptr... idk
+	ptr_t padding[12];
 	// Virtual Function 12
 	ptr_t GetLocalPlayer;
 	ptr_t padding2[13];
@@ -29,27 +31,32 @@ struct CEngineClient {
 	// Virtual Function 72
 	ptr_t GetNetChannelInfo;
 };
+struct CBaseClientState {
+	ptr_t padding[36];
+	// Virtual Function 36
+	ptr_t SetSignonState;
+
+	explicit operator bool() const {
+		return SetSignonState;
+	}
+};
 
 
-static procptr_t getLocalClient(const procptr_t engineClientPtr, const CEngineClient engineClient) {
+static CBaseClientState getLocalClient(const procptr_t engineClientPtr, const CEngineClient engineClient) {
 	// We use GetBaseLocalClient() instead of GetLocalClient() because we just need the main client.
 	// GetLocalClient() gets the client from an array at the index passed to the function.
 	// There are multiple clients because of the split screen feature.
 
 	const auto modules = proc->modules();
 
-	auto iter = proc->modules().find("engine.so");
+	auto iter = modules.find("engine.so");
 	auto engineBaseAddress = iter->second.baseAddress();
 
 	// TODO:
 	//  74 for Left 4 Dead
 	//  72 for GMOD
-	const auto GetNetChannelInfo = proc->virtualFunction(engineClientPtr, 72);
-	std::printf("EngineClientPtr peekPtr address: 0x%lx\n", proc->peekPtr(engineClientPtr) - engineBaseAddress);
+	//const auto GetNetChannelInfo = proc->virtualFunction(engineClientPtr, 72);
 	const auto GetNetChannelInfoViaStruct = engineClient.GetNetChannelInfo;
-
-	std::printf("GetNetChannelInfo: 0x%lX | GetNetChannelInfoViaStruct: 0x%lX\n", GetNetChannelInfo - engineBaseAddress, GetNetChannelInfoViaStruct - engineBaseAddress);
-	std::printf("GetNetChannelInfoDifference: %lu\n", (GetNetChannelInfoViaStruct - engineBaseAddress) - (GetNetChannelInfo - engineBaseAddress));
 
 	// Windows:
 	// E8 ?? ?? ?? ??    call    GetBaseLocalClient
@@ -68,9 +75,10 @@ static procptr_t getLocalClient(const procptr_t engineClientPtr, const CEngineCl
 	// TODO:
 	//  GMOD only
 	// 0x86 or 0x87
-//	const auto callTarget         = proc->peek< int32_t >(GetNetChannelInfo + 3);
-//	const auto callInstructionEnd = GetNetChannelInfo + 7;
-//	const auto GetBaseLocalClient = callInstructionEnd + callTarget;
+	//const auto callTarget         = proc->peek< int32_t >(GetNetChannelInfoViaStruct + 2);
+	//const auto callInstructionEnd = GetNetChannelInfoViaStruct + 6;
+	//const auto GetBaseLocalClient = callInstructionEnd + callTarget;
+	//std::printf("callTarget: 0x%X | callInstructionEnd: 0x%X\n", callTarget, callInstructionEnd);
 
 
 //	const auto callTarget         = proc->peek< int32_t >(GetNetChannelInfo + (isWin32 ? 1 : 7));
@@ -96,11 +104,37 @@ static procptr_t getLocalClient(const procptr_t engineClientPtr, const CEngineCl
 	// TODO: GMod only currently
 	//auto iter = proc->modules().find("engine.so");
 	//auto engineBaseAddress = iter->second.baseAddress();
-	//std::cout << "engine.so base address: " << engineBaseAddress << std::endl;
-	auto address = engineBaseAddress + 0x00325060 + 1;
+	//std::printf("engine.so base address: 0x%X\n", engineBaseAddress);
+	// TODO: KNOWN GOOD GMOD ADDRESS
+	//auto address = engineBaseAddress + 0x00325060 + 1;
 	//std::cout << "LocalBaseClient address: " << address << std::endl;
 
-	return proc->peekPtr(address);
+	//std::printf("GetBaseLocalClient RAW: 0x%X\n", GetBaseLocalClient);
+	//std::printf("GetBaseLocalClient: 0x%X\n", GetBaseLocalClient - engineBaseAddress);
+
+	const auto StartOfDatRef               = GetNetChannelInfoViaStruct + 2;
+	const auto DatPtr                      = proc->peekPtr(StartOfDatRef);
+	const auto ClientPtr                   = proc->peekPtr(engineBaseAddress + DatPtr);
+
+	std::printf("StartOfDatReference: 0x%lX | DatPtr: 0x%lX | Client?: 0x%lX | Raw Client?: 0x%lX\n",
+				StartOfDatRef - engineBaseAddress, DatPtr - engineBaseAddress, ClientPtr - engineBaseAddress,
+				ClientPtr);
+
+	if (!ClientPtr) {
+		return {};
+	}
+
+	auto GetBaseLocalClient = proc->peek< CBaseClientState >(ClientPtr);
+
+	//for (int i = 0; i < (sizeof(GetBaseLocalClient.padding)/sizeof(GetBaseLocalClient.padding[0])); ++i) {
+	//	std::printf("CBaseClientState::Padding Pointers %d: 0x%X\n", i, GetBaseLocalClient.padding[i]);
+	//}
+
+	std::printf("CBaseClientState::SetSignonState: 0x%X\n", GetBaseLocalClient.SetSignonState);
+
+
+	return GetBaseLocalClient;
+	//return proc->peekPtr(address);
 		   //+ proc->peek< int8_t >(address + 10);
 
 	//return proc->peekPtr(proc->peek< uint32_t >(engineBaseAddress))
