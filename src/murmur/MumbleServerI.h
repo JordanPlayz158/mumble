@@ -66,6 +66,9 @@ public:
 	virtual void sendMessage_async(const ::MumbleServer::AMD_Server_sendMessagePtr &, ::Ice::Int, const ::std::string &,
 								   const Ice::Current &);
 
+	virtual void sendPluginDataTransmission_async(const const ::MumbleServer::AMD_Server_sendPluginDataTransmissionPtr &, ::Ice::Int, const ::std::string &,
+												  const Ice::Current &)
+
 	virtual void hasPermission_async(const ::MumbleServer::AMD_Server_hasPermissionPtr &, ::Ice::Int, ::Ice::Int,
 									 ::Ice::Int, const ::Ice::Current &);
 	virtual void effectivePermissions_async(const ::MumbleServer::AMD_Server_effectivePermissionsPtr &, ::Ice::Int,

@@ -1185,6 +1185,15 @@ static void impl_Server_sendMessage(const ::MumbleServer::AMD_Server_sendMessage
 	cb->ice_response();
 }
 
+static void impl_Server_sendPluginDataTransmission(const ::MumbleServer::AMD_Server_sendPluginDataTransmissionPtr cb, int server_id,
+									::Ice::Int session, const ::std::string &text) {
+	NEED_SERVER;
+	NEED_PLAYER;
+
+	server->sendProtoMessage(user, text, Mumble::Protocol::TCPMessageType::PluginDataTransmission);
+	cb->ice_response();
+}
+
 #define ACCESS_Server_hasPermission_READ
 static void impl_Server_hasPermission(const ::MumbleServer::AMD_Server_hasPermissionPtr cb, int server_id,
 									  ::Ice::Int session, ::Ice::Int channelid, ::Ice::Int perm) {
